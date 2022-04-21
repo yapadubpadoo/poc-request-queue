@@ -9,10 +9,7 @@ export default class SessionRequester {
   private queueWaitTimeoutInSeconds = 50;
   /* ------------------------------------------ */
   private queues: {
-    [key: string]: {
-      resolvers: any[];
-      // rejecters: any[];
-    };
+    [key: string]: any[];
   };
   private cacheClient: RedisClientType;
   private subscriberClient: RedisClientType;
@@ -33,7 +30,12 @@ export default class SessionRequester {
   public async handleSessionMessage(sessionMessage: string) {
     console.log('[Pub/Sub] Got message +++', sessionMessage);
     const messageData = JSON.parse(sessionMessage);
-    const jobs = {...this.queues[`q-${messageData.id}`]};
+
+    if (this.queues[`q-${messageData.id}`] === undefined) {
+      return;
+    }
+
+    const jobs = [...this.queues[`q-${messageData.id}`]];
     delete this.queues[`q-${messageData.id}`];
 
     console.log(
@@ -44,7 +46,8 @@ export default class SessionRequester {
     );
 
     await this.save(messageData.id, sessionMessage);
-    jobs.resolvers.forEach(resolve => {
+    // console.log(`[${messageData.id}]`, jobs);
+    jobs.forEach(resolve => {
       resolve(messageData);
     });
   }
@@ -64,17 +67,20 @@ export default class SessionRequester {
     const requestKey = `request-${id}`;
     const existingSessionRequest = await this.cacheClient.getSet(
       requestKey,
-      'locked'
+      'REQUEST_LOCKED'
     );
     await this.cacheClient.expire(
       requestKey,
       this.requestSessionTimeoutInSeconds
     );
-    console.log(
-      `[${id}] Get existing session request, found "${existingSessionRequest}"`
-    );
+
     if (existingSessionRequest === null) {
-      console.log(`[${id}] Request new session`);
+      console.log(
+        `[${id}] Get existing session request`,
+        'found',
+        existingSessionRequest,
+        '*** Request new one ...'
+      );
       setTimeout(async () => {
         const generatedSession = {
           id: `${id}`,
@@ -91,22 +97,26 @@ export default class SessionRequester {
           generatedSession
         );
       }, 5000);
+    } else {
+      console.log(
+        `[${id}] Get existing session request`,
+        'found',
+        existingSessionRequest,
+        'just wait ...'
+      );
     }
   }
 
   public async queueRequest(id: string) {
     const queueKey = `q-${id}`;
     if (this.queues[queueKey] === undefined) {
-      this.queues[queueKey] = {
-        resolvers: [],
-        // rejecters: [],
-      };
+      this.queues[queueKey] = [];
     }
     return new Promise((resolve, reject) => {
-      this.queues[queueKey].resolvers.push(resolve);
+      this.queues[queueKey].push(resolve);
       console.log(
         `[${id}] Request is queued, size = `,
-        this.queues[queueKey].resolvers.length
+        this.queues[queueKey].length
       );
       setTimeout(() => {
         reject(new Error(`[${id}] Timeout waiting for session`));

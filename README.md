@@ -19,6 +19,7 @@ Runs a benchmark using 10 threads, and keeping 10 HTTP connections open, for 30 
 
 ```bash
 wrk -t10 -c10 -d30s --timeout 60 http://127.0.0.1:3000
+wrk -t10 -c10 -d30s --timeout 60 http://127.0.0.1:3001
 ```
 
 Analyze https://github.com/clinicjs/node-clinic
