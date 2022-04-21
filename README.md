@@ -1,5 +1,12 @@
 # poc-request-queue
 
+## Prepare
+
+```bash
+docker-compose up
+ts-node src/index.ts
+```
+
 ## Test
 
 Using https://github.com/wg/wrk
